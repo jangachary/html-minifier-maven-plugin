@@ -21,7 +21,7 @@ import com.google.javascript.jscomp.SourceFile;
 import com.googlecode.htmlcompressor.compressor.HtmlCompressor;
 import com.yahoo.platform.yui.compressor.CssCompressor;
 
-@Mojo(name = "minify-html", defaultPhase = LifecyclePhase.PACKAGE)
+@Mojo(name = "minify-html", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
 public class HtmlMinifierMojo extends AbstractMojo {
 
 	@Parameter(property = "minifyHtml.sourceDirectory", defaultValue = "${project.basedir}/src/main/resources/templates")
@@ -105,13 +105,36 @@ public class HtmlMinifierMojo extends AbstractMojo {
 	}
 
 	// Function to minify inline <script> content using Google Closure Compiler
+//	private String minifyInlineScripts(String content) throws MojoExecutionException {
+////		Pattern scriptPattern = Pattern.compile("<script[^>]*>(.*?)</script>", Pattern.DOTALL);
+////		Pattern scriptPattern = Pattern.compile("<script(?![^>]*\\bsrc\\b)[^>]*>(.*?)</script>", Pattern.DOTALL);
+//		Pattern scriptPattern = Pattern.compile("<script(?![^>]*(\\bsrc\\b|th:[^\\s=]+))[^>]*>(.*?)</script>",
+//				Pattern.DOTALL);
+//
+//		Matcher matcher = scriptPattern.matcher(content);
+//		StringBuffer minifiedContent = new StringBuffer();
+//
+//		while (matcher.find()) {
+//			String scriptContent = matcher.group(1);
+//			String minifiedScript = compileJavaScript(scriptContent);
+//			matcher.appendReplacement(minifiedContent,
+//					"<script>" + Matcher.quoteReplacement(minifiedScript) + "</script>");
+//		}
+//
+//		matcher.appendTail(minifiedContent);
+//		return minifiedContent.toString();
+//	}
 	private String minifyInlineScripts(String content) throws MojoExecutionException {
-		Pattern scriptPattern = Pattern.compile("<script[^>]*>(.*?)</script>", Pattern.DOTALL);
+		// Pattern to match <script> tags that do not have a 'src' attribute or
+		// attributes starting with 'th:'
+		Pattern scriptPattern = Pattern.compile("<script(?![^>]*(\\bsrc\\b|th:[^\\s=]+))[^>]*>(.*?)</script>",
+				Pattern.DOTALL);
+
 		Matcher matcher = scriptPattern.matcher(content);
 		StringBuffer minifiedContent = new StringBuffer();
 
 		while (matcher.find()) {
-			String scriptContent = matcher.group(1);
+			String scriptContent = matcher.group(2); // Use group(2) for the actual script content
 			String minifiedScript = compileJavaScript(scriptContent);
 			matcher.appendReplacement(minifiedContent,
 					"<script>" + Matcher.quoteReplacement(minifiedScript) + "</script>");
@@ -159,9 +182,10 @@ public class HtmlMinifierMojo extends AbstractMojo {
 			if (result.errors != null && result.errors.size() > 0) {
 				throw new MojoExecutionException("JavaScript compilation errors: " + result.errors.get(0).toString());
 			}
-
+			String compiledJs = compiler.toSource();
+			compiledJs = compiledJs.replaceAll("'use strict';", "").replaceAll("\"use strict\";", "");
 			// Return the compiled JavaScript code
-			return compiler.toSource();
+			return compiledJs;
 		} catch (Exception e) {
 			throw new MojoExecutionException("Failed to compile JavaScript", e);
 		}
